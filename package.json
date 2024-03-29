@@ -7,6 +7,7 @@
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "prepare.ios": "(cd ios; pod install)",
+    "prepare": "./scripts/prepare.sh",
     "start": "react-native start",
     "test": "jest"
   },

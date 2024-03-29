@@ -4,6 +4,7 @@ import * as React from 'react';
 import {StyleSheet} from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 
+import ENV from '../env.json';
 import {showError} from './AirshipInstance';
 import {MainRouter} from './MainRouter';
 
@@ -18,7 +19,7 @@ export const Services = (_props: Props) => {
       <LoginUiProvider>
         <MakeEdgeContext
           airbitzSupport
-          apiKey="..."
+          apiKey={ENV.AIRBITZ_API_KEY}
           appId=""
           // Called when the core is done loading:
           onLoad={setContext}
