@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 
+#import <Foundation/Foundation.h>
 #import <React/RCTBundleURLProvider.h>
 
 @implementation AppDelegate
@@ -16,6 +17,11 @@
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
 {
+  NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+                                                       NSUserDomainMask, YES);
+  NSString *basePath = [paths firstObject];
+  printf("App directory: %s", [basePath cStringUsingEncoding:NSUTF8StringEncoding]);
+
   return [self getBundleURL];
 }
 
