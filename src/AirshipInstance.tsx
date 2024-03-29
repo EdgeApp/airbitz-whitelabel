@@ -1,6 +1,6 @@
 import * as React from 'react';
-import {Text} from 'react-native';
-import {makeAirship, AirshipDropdown} from 'react-native-airship';
+import {makeAirship} from 'react-native-airship';
+import {ThemedDropdown} from './theming/ThemedDropdown';
 
 export const Airship = makeAirship();
 
@@ -12,8 +12,6 @@ export function showError(error: unknown): void {
   console.log('Showing error drop-down alert: ', error);
 
   Airship.show(bridge => (
-    <AirshipDropdown bridge={bridge}>
-      <Text>{String(error)}</Text>
-    </AirshipDropdown>
+    <ThemedDropdown bridge={bridge}>{String(error)}</ThemedDropdown>
   )).catch(err => console.error(err));
 }

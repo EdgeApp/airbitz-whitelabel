@@ -1,9 +1,9 @@
 import {EdgeAccount, EdgeContext} from 'edge-core-js';
 import {LoginScreen} from 'edge-login-ui-rn';
 import * as React from 'react';
-import {Text} from 'react-native';
 
 import {AirbitzApp} from './AirbitzApp';
+import {LoadingScene} from './LoadingScene';
 
 interface Props {
   context: EdgeContext | undefined;
@@ -18,7 +18,7 @@ export const MainRouter = (props: Props) => {
   // Once the context is ready, we can show the login screen.
   // Once the user logs in, we can show the main app:
   return context == null ? (
-    <Text>Loading...</Text>
+    <LoadingScene />
   ) : account == null ? (
     <LoginScreen
       accountOptions={{}}
