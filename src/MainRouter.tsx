@@ -7,7 +7,7 @@ import {
 } from 'edge-login-ui-rn';
 import * as React from 'react';
 
-import {AirbitzApp} from './AirbitzApp';
+import {MainScene} from './MainScene';
 import {showError} from './AirshipInstance';
 import {ChangePasswordScene} from './ChangePasswordScene';
 import {LoadingScene} from './LoadingScene';
@@ -75,7 +75,7 @@ export const MainRouter = (props: Props) => {
       onComplete={handleChangePasswordComplete}
     />
   ) : (
-    <AirbitzApp
+    <MainScene
       account={account}
       onChangePassword={handleChangePassword}
       onLogout={handleLogout}

@@ -13,7 +13,7 @@ interface Props {
   onLogout: () => void;
 }
 
-export const AirbitzApp = (props: Props) => {
+export const MainScene = (props: Props) => {
   const {onChangePassword, onLogout} = props;
   const theme = useTheme();
   const styles = getStyles(theme);
