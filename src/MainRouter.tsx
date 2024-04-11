@@ -1,6 +1,12 @@
-import {EdgeAccount, EdgeContext} from 'edge-core-js';
+import {
+  EdgeAccount,
+  EdgeContext,
+  OtpError,
+  asMaybeOtpError,
+} from 'edge-core-js';
 import {
   LoginScreen,
+  OtpRepairScreen,
   SecurityAlertsScreen,
   hasSecurityAlerts,
   watchSecurityAlerts,
@@ -37,6 +43,11 @@ export const MainRouter = (props: Props) => {
   const [securityAlerts, setSecurityAlerts] = React.useState(false);
   const handleSecurityAlertsComplete = () => setSecurityAlerts(false);
 
+  // OTP repair screen:
+  const [otpError, setOtpError] = React.useState<OtpError | undefined>();
+  const handleOtpRepairComplete = () => setOtpError(undefined);
+
+  // Watch for security alerts:
   React.useEffect(() => {
     if (account == null) {
       return;
@@ -45,6 +56,20 @@ export const MainRouter = (props: Props) => {
       setSecurityAlerts(true);
     }
     return watchSecurityAlerts(account, () => setSecurityAlerts(true));
+  }, [context, account]);
+
+  // Watch for OTP errors:
+  React.useEffect(() => {
+    if (context == null || account == null) {
+      return;
+    }
+    context.on('error', (error: unknown) => {
+      console.log(error);
+      const otpError = asMaybeOtpError(error);
+      if (otpError != null) {
+        setOtpError(otpError);
+      }
+    });
   }, [context, account]);
 
   // Once the context is ready, we can show the login screen.
@@ -61,6 +86,16 @@ export const MainRouter = (props: Props) => {
       install our new application instead."
       primaryLogo={require('./assets/logo_large.png')}
       onLogin={setAccount}
+    />
+  ) : otpError != null ? (
+    <OtpRepairScreen
+      branding={{
+        appName: 'Airbitz',
+      }}
+      context={context}
+      account={account}
+      otpError={otpError}
+      onComplete={handleOtpRepairComplete}
     />
   ) : securityAlerts ? (
     <SecurityAlertsScreen
