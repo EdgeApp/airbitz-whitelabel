@@ -11,7 +11,7 @@ import {ThemeProvider, theme} from './theming/ThemeProvider';
 
 interface Props {}
 
-export const Services = (_props: Props) => {
+export const App = (_props: Props) => {
   // Stores the Edge context:
   const [context, setContext] = React.useState<EdgeContext | undefined>();
 
