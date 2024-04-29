@@ -19,7 +19,7 @@ def preBuildStages(String stageName, versionFile) {
     }
 
     sh "node -r sucrase/register ./scripts/secretFiles.ts ${BRANCH_NAME} ${SECRET_FILES}"
-    sh "node -r sucrase/register ./scripts/patchFiles.ts edge ${BRANCH_NAME}"
+    sh "node -r sucrase/register ./scripts/patchFiles.ts airbitz ${BRANCH_NAME}"
 
     // Pick the new build number and version from git:
     sh 'node -r sucrase/register ./scripts/updateVersion.ts'
@@ -28,34 +28,16 @@ def preBuildStages(String stageName, versionFile) {
   }
 }
 
-def preTest(String stageName) {
-  stage("${stageName}: preTest") {
-    sh 'yarn test --ci'
-  }
-}
-
 def buildProduction(String stageName) {
   stage("Build ${stageName}") {
     echo "Running on ${env.NODE_NAME}"
-    if (env.BRANCH_NAME in ['develop', 'staging', 'master', 'beta', 'test-cheddar', 'test-feta', 'test-gouda', 'test-halloumi', 'test-paneer', 'test', 'testMaestro', 'yolo']) {
+    if (env.BRANCH_NAME in ['airbitz']) {
       if (stageName == 'ios' && params.IOS_BUILD) {
         sh 'npm run prepare.ios'
-        sh "node -r sucrase/register ./scripts/deploy.ts edge ios ${BRANCH_NAME}"
+        sh "node -r sucrase/register ./scripts/deploy.ts airbitz ios ${BRANCH_NAME}"
       }
       if (stageName == 'android' && params.ANDROID_BUILD) {
-        sh "node -r sucrase/register ./scripts/deploy.ts edge android ${BRANCH_NAME}"
-      }
-    }
-  }
-}
-
-def buildSim(String stageName) {
-  stage("Build Sim ${stageName}") {
-    if (env.BRANCH_NAME in ['develop', 'staging', 'master', 'beta', 'testMaestro']) {
-      if (stageName == 'ios' && params.IOS_BUILD_SIM) {
-        echo "Running on ${env.NODE_NAME}"
-        sh 'npm run prepare.ios'
-        sh "node -r sucrase/register ./scripts/deploy.ts edge ios-sim ${BRANCH_NAME}"
+        sh "node -r sucrase/register ./scripts/deploy.ts airbitz android ${BRANCH_NAME}"
       }
     }
   }
@@ -81,7 +63,6 @@ pipeline {
   parameters {
     booleanParam(name: 'ANDROID_BUILD', defaultValue: true, description: 'Build an Android version')
     booleanParam(name: 'IOS_BUILD', defaultValue: true, description: 'Build an iOS version')
-    booleanParam(name: 'IOS_BUILD_SIM', defaultValue: true, description: 'Build an iOS simulator version')
     booleanParam(name: 'VERBOSE', defaultValue: false, description: 'Complete build log output')
   }
   environment {
@@ -121,18 +102,7 @@ pipeline {
           steps {
             script {
               preBuildStages('IOS', global.versionFile)
-              preTest('IOS')
               buildProduction('ios')
-            }
-          }
-        }
-        stage('IOS Simulator Build') {
-          agent { label 'ios-build-sim' }
-          steps {
-            script {
-              preBuildStages('IOS Simulator', global.versionFile)
-              preTest('IOS Simulator')
-              buildSim('ios')
             }
           }
         }
@@ -141,7 +111,6 @@ pipeline {
           steps {
             script {
               preBuildStages('Android', global.versionFile)
-              preTest('Android')
               buildProduction('android')
             }
           }
