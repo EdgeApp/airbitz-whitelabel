@@ -1,7 +1,7 @@
 import childProcess from 'child_process';
 import fs from 'fs';
 import {copySync} from 'fs-extra';
-import {join} from 'path';
+import {join, dirname} from 'path';
 
 const argv = process.argv;
 const mylog = console.log;
@@ -73,7 +73,7 @@ async function main() {
 
 // Copies a file if it exists and overwrites destination
 function quietCopy(src: string, dest: string) {
-  if (fs.existsSync(src)) {
+  if (fs.existsSync(src) && fs.existsSync(dirname(dest))) {
     console.log(`Copying ${src} > ${dest}`);
     fs.copyFileSync(src, dest);
   }
