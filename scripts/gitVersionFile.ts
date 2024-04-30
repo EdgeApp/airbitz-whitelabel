@@ -26,6 +26,7 @@ import fs from 'fs';
 import {join} from 'path';
 
 const specialBranches: {[branch: string]: string} = {
+  airbitz: '',
   develop: '-d',
   master: '',
   beta: '',
