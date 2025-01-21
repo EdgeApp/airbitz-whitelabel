@@ -1,0 +1,69 @@
+diff --git a/node_modules/rn-id-blurview/android/build.gradle b/node_modules/rn-id-blurview/android/build.gradle
+index 557929e..67c9a86 100644
+--- a/node_modules/rn-id-blurview/android/build.gradle
++++ b/node_modules/rn-id-blurview/android/build.gradle
+@@ -45,5 +45,5 @@ repositories {
+ 
+ dependencies {
+     api 'com.facebook.react:react-native:+'
+-    implementation 'com.github.Dimezis:BlurView:version-2.0.2'
++    implementation 'com.github.Dimezis:BlurView:version-2.0.6'
+ }
+diff --git a/node_modules/rn-id-blurview/src/Views/BlurView.android.tsx b/node_modules/rn-id-blurview/src/Views/BlurView.android.tsx
+index 74052b0..fdbd685 100644
+--- a/node_modules/rn-id-blurview/src/Views/BlurView.android.tsx
++++ b/node_modules/rn-id-blurview/src/Views/BlurView.android.tsx
+@@ -26,7 +26,7 @@ interface AndroidProps extends ViewProps {
+   overlayColor?: string;
+ }
+ 
+-const BlurView = ({ blurRadius, blurAmount, blurType, overlayColor, downsampleFactor, ...nativeProps}: PropsWithChildren<AndroidProps>) => {
++const BlurView = ({ blurRadius, blurAmount=10, blurType='dark', overlayColor, downsampleFactor, ...nativeProps}: PropsWithChildren<AndroidProps>) => {
+   const calclatedBlurType: AndroidBlurType = ['light', 'xlight', 'dark'].includes(blurType) ? blurType as AndroidBlurType : 'dark';
+ 
+   useEffect(() => {
+@@ -94,11 +94,6 @@ const styles = StyleSheet.create<{transparent: ViewStyle}>({
+   transparent: {backgroundColor: 'transparent'},
+ });
+ 
+-BlurView.defaultProps = {
+-  blurType: 'dark',
+-  blurAmount: 10,
+-};
+-
+ // requireNativeComponent automatically resolves 'BlurView' to 'BlurViewManager'
+ const NativeBlurView = requireNativeComponent<AndroidProps>('BlurView');
+ 
+diff --git a/node_modules/rn-id-blurview/src/Views/BlurView.ios.tsx b/node_modules/rn-id-blurview/src/Views/BlurView.ios.tsx
+index b2775a0..3da4d3e 100644
+--- a/node_modules/rn-id-blurview/src/Views/BlurView.ios.tsx
++++ b/node_modules/rn-id-blurview/src/Views/BlurView.ios.tsx
+@@ -4,8 +4,15 @@ import { requireNativeComponent, StyleSheet, ViewStyle } from 'react-native';
+ import type { BlurViewProperties } from '../types';
+ 
+ const BlurView = (props: BlurViewProperties) => {
++  const { blurType = 'dark', blurAmount = 10, style, ...rest } = props;
++
+   return (
+-    <NativeBlurView style={StyleSheet.compose(styles.transparent, props?.style)} {...props} />
++    <NativeBlurView
++      style={StyleSheet.compose(styles.transparent, style)}
++      blurType={blurType}
++      blurAmount={blurAmount}
++      {...rest}
++    />
+   );
+ };
+ 
+@@ -13,11 +20,6 @@ const styles = StyleSheet.create<{transparent: ViewStyle}>({
+   transparent: {backgroundColor: 'transparent'},
+ });
+ 
+-BlurView.defaultProps = {
+-  blurType: 'dark',
+-  blurAmount: 10,
+-};
+-
+ // requireNativeComponent automatically resolves 'BlurView' to 'BlurViewManager'
+ const NativeBlurView = requireNativeComponent<BlurViewProperties>('BlurView');
+ 
