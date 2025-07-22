@@ -1,8 +1,11 @@
 import childProcess from 'child_process';
 import fs from 'fs';
-import {join} from 'path';
-import {sprintf} from 'sprintf-js';
+import { join } from 'path';
+import { sprintf } from 'sprintf-js';
 
+import { deleteOldDirsSync } from './cleanDirectories';
+
+const BUILD_ARCHIVE_MONTHS = 6;
 const LATEST_TEST_FILE = 'latestTestFile.json';
 const argv = process.argv;
 const mylog = console.log;
@@ -13,6 +16,10 @@ const githubSshKey =
 
 let _currentPath = __dirname;
 const baseDir = join(_currentPath, '..');
+
+const now = new Date();
+const cutoffDate = new Date();
+cutoffDate.setMonth(now.getMonth() - BUILD_ARCHIVE_MONTHS);
 
 /**
  * Things we expect to be set in the config file:
@@ -35,11 +42,9 @@ interface BuildConfigFile {
   bundleId: string;
 
   // Upload options:
-  appCenterApiToken: string;
-  appCenterAppName: string;
-  appCenterDistroGroup: string;
-  appCenterGroupName: string;
-  bugsnagApiKey: string;
+  zealotUrl?: string;
+  zealotApiToken?: string;
+  zealotChannelKey?: string;
   hockeyAppId: string;
   hockeyAppTags: string;
   hockeyAppToken: string;
@@ -57,7 +62,7 @@ interface BuildObj extends BuildConfigFile {
   guiDir: string;
   guiPlatformDir: string;
   platformType: string; // 'android' | 'ios'
-  simBuild: boolean;
+  maestroBuild: boolean;
   repoBranch: string; // 'develop' | 'master' | 'test'
   tmpDir: string;
   buildArchivesDir: string;
@@ -91,11 +96,12 @@ main();
 function main() {
   if (argv.length < 4) {
     mylog(
-      'Usage: node -r sucrase/register deploy.ts [project] [platform] [branch]',
+      'Usage: node -r sucrase/register deploy.ts [project] [platform] [branch] [test build]',
     );
     mylog('  project options: edge');
-    mylog('  platform options: ios, android, ios-sim');
+    mylog('  platform options: ios, android');
     mylog('  branch options: master, develop');
+    mylog('  test build options (optional): maestro');
   }
 
   const buildObj: BuildObj = {} as any;
@@ -104,10 +110,9 @@ function main() {
   makeProject(buildObj);
   makeCommonPost(buildObj);
 
-  // buildCommonPre()
   if (buildObj.platformType === 'ios') {
-    if (buildObj.simBuild) {
-      buildIosSim(buildObj);
+    if (buildObj.maestroBuild) {
+      buildIosMaestro(buildObj);
     } else {
       buildIos(buildObj);
     }
@@ -119,9 +124,9 @@ function main() {
 
 function makeCommonPre(argv: string[], buildObj: BuildObj) {
   buildObj.guiDir = _rootProjectDir;
+  buildObj.maestroBuild = argv[5] === 'maestro';
   buildObj.repoBranch = argv[4]; // master or develop
-  buildObj.platformType = argv[3] === 'ios-sim' ? 'ios' : argv[3]; // ios or android
-  buildObj.simBuild = argv[3] === 'ios-sim';
+  buildObj.platformType = argv[3];
   buildObj.projectName = argv[2];
   buildObj.guiPlatformDir = buildObj.guiDir + buildObj.platformType;
   buildObj.tmpDir = `${buildObj.guiDir}temp`;
@@ -145,13 +150,24 @@ function makeProject(buildObj: BuildObj) {
 }
 
 function makeCommonPost(buildObj: BuildObj) {
+  const envJsonPath = buildObj.guiDir + '/env.json';
+  let envJson;
+  if (fs.existsSync(envJsonPath)) {
+    envJson = JSON.parse(fs.readFileSync(envJsonPath, 'utf8'));
+  }
   if (buildObj.envJson != null) {
-    const envJsonPath = buildObj.guiDir + '/env.json';
-    let envJson = {};
-    if (fs.existsSync(envJsonPath)) {
-      envJson = JSON.parse(fs.readFileSync(envJsonPath, 'utf8'));
+    if (envJson == null) {
+      throw new Error('env.json file is missing');
     }
     envJson = {...envJson, ...buildObj.envJson[buildObj.repoBranch]};
+  }
+  if (buildObj.maestroBuild) {
+    if (envJson == null) {
+      throw new Error('env.json file is missing');
+    }
+    envJson = {...envJson, ENABLE_MAESTRO_BUILD: true};
+  }
+  if (envJson != null) {
     fs.chmodSync(envJsonPath, 0o600);
     fs.writeFileSync(envJsonPath, JSON.stringify(envJson, null, 2));
   }
@@ -175,10 +191,6 @@ function makeCommonPost(buildObj: BuildObj) {
   }
   buildObj.productNameClean = buildObj.productName.replace(' ', '');
 }
-
-// function buildCommonPre() {
-//   call('npm install -g appcenter-cli')
-// }
 
 function buildIos(buildObj: BuildObj) {
   chdir(buildObj.guiDir);
@@ -250,6 +262,12 @@ function buildIos(buildObj: BuildObj) {
   // chdir(buildObj.guiDir)
   // call('react-native bundle --dev false --entry-file index.ios.js --bundle-output ios/main.jsbundle --platform ios')
 
+  const xcodeArchiveDir = `${
+    process.env.HOME || ''
+  }/Library/Developer/Xcode/Archives/`;
+  // Delete old archive directories
+  deleteOldDirsSync(xcodeArchiveDir, cutoffDate);
+
   chdir(buildObj.guiPlatformDir);
 
   let cmdStr;
@@ -265,7 +283,7 @@ function buildIos(buildObj: BuildObj) {
     }/Library/Keychains/login.keychain`,
   );
 
-  cmdStr = `xcodebuild -allowProvisioningUpdates -workspace ${buildObj.xcodeWorkspace} -scheme ${buildObj.xcodeScheme} archive`;
+  cmdStr = `xcodebuild -allowProvisioningUpdates -workspace ${buildObj.xcodeWorkspace} -scheme ${buildObj.xcodeScheme} -destination 'generic/platform=iOS' archive`;
   if (process.env.DISABLE_XCPRETTY === 'false') {
     cmdStr = cmdStr + ' | xcpretty';
   }
@@ -273,9 +291,7 @@ function buildIos(buildObj: BuildObj) {
   call(cmdStr);
 
   const buildDate = builddate();
-  const buildDir = `${
-    process.env.HOME || ''
-  }/Library/Developer/Xcode/Archives/${buildDate}`;
+  const buildDir = `${xcodeArchiveDir}${buildDate}`;
 
   chdir(buildDir);
   let archiveDir = cmd('ls -t');
@@ -345,7 +361,7 @@ function buildIos(buildObj: BuildObj) {
   buildObj.testRepoUrl = undefined;
 }
 
-function buildIosSim(buildObj: BuildObj) {
+function buildIosMaestro(buildObj: BuildObj) {
   const {
     buildNum,
     guiDir,
@@ -407,6 +423,7 @@ function buildAndroid(buildObj: BuildObj) {
     platformType,
     repoBranch,
     guiPlatformDir,
+    maestroBuild,
     bundleToolPath,
     androidKeyStore,
     androidKeyStoreAlias,
@@ -432,19 +449,22 @@ function buildAndroid(buildObj: BuildObj) {
   process.env.ORG_GRADLE_PROJECT_keyAlias = buildObj.androidKeyStoreAlias;
   process.env.ORG_GRADLE_PROJECT_keyPassword = buildObj.androidKeyStorePassword;
 
+  const archivePlatformDir = join(buildArchivesDir, repoBranch, platformType);
+
+  // Delete old archive directories
+  deleteOldDirsSync(archivePlatformDir, cutoffDate);
+
   chdir(buildObj.guiPlatformDir);
   call('./gradlew clean');
   call('./gradlew signingReport');
   call(sprintf('./gradlew %s', buildObj.androidTask));
 
+  const testBuild = maestroBuild ? '-maestro' : '';
+
   // Process the AAB files created into APK format and place in archive directory
-  const outfile = `${buildObj.productNameClean}-${buildObj.repoBranch}-${buildObj.buildNum}`;
-  const archiveDir = join(
-    buildArchivesDir,
-    repoBranch,
-    platformType,
-    String(buildNum),
-  );
+  const outfile = `${buildObj.productNameClean}-${buildObj.repoBranch}-${buildObj.buildNum}${testBuild}`;
+
+  const archiveDir = join(archivePlatformDir, String(buildNum));
   fs.mkdirSync(archiveDir, {recursive: true});
   const aabPath = join(archiveDir, `${outfile}.aab`);
   const apksPath = join(archiveDir, `${outfile}.apks`);
@@ -465,11 +485,11 @@ function buildAndroid(buildObj: BuildObj) {
 }
 
 function buildCommonPost(buildObj: BuildObj) {
-  const {simBuild} = buildObj;
+  const {maestroBuild, zealotApiToken, zealotChannelKey, zealotUrl} = buildObj;
   let curl;
   const notes = `${buildObj.productName} ${buildObj.version} (${buildObj.buildNum}) branch: ${buildObj.repoBranch} #${buildObj.guiHash}`;
 
-  if (buildObj.hockeyAppToken && buildObj.hockeyAppId && !simBuild) {
+  if (buildObj.hockeyAppToken && buildObj.hockeyAppId && !maestroBuild) {
     mylog('\n\nUploading to HockeyApp');
     mylog('**********************\n');
     const url = sprintf(
@@ -495,61 +515,28 @@ function buildCommonPost(buildObj: BuildObj) {
     mylog('\nUploaded to HockeyApp');
   }
 
-  if (buildObj.bugsnagApiKey && buildObj.dSymFile && !simBuild) {
-    mylog('\n\nUploading to Bugsnag');
-    mylog('*********************\n');
-
-    const cpa = `cp -a ${
-      buildObj.dSymFile
-    }/Contents/Resources/DWARF/${escapePath(buildObj.productName)} ${
-      buildObj.tmpDir
-    }/`;
-    call(cpa);
-    curl =
-      '/usr/bin/curl https://upload.bugsnag.com/ ' +
-      `-F dsym=@${buildObj.tmpDir}/${escapePath(buildObj.productName)} ` +
-      `-F projectRoot=${buildObj.guiPlatformDir}`;
-    call(curl);
-  }
-
   if (
-    buildObj.bugsnagApiKey &&
-    buildObj.platformType === 'android' &&
-    !simBuild
+    zealotApiToken != null &&
+    zealotUrl != null &&
+    zealotChannelKey != null &&
+    !maestroBuild
   ) {
-    mylog('\n\nUploading Android map files to Bugsnag');
-    mylog('*********************\n');
+    const branch = encodeURIComponent(buildObj.repoBranch);
+    const gitCommit = encodeURIComponent(buildObj.guiHash);
     chdir(buildObj.guiDir);
-    call(
-      `yarn run bugsnag-source-maps upload-react-native \
-      --api-key ${buildObj.bugsnagApiKey} \
-      --app-version ${buildObj.version} \
-      --app-version-code ${buildObj.buildNum} \
-      --bundle ${buildObj.bundlePath} \
-      --platform ${buildObj.platformType} \
-      --project-root ${buildObj.guiPlatformDir} \
-      --source-map ${buildObj.bundleMapFile} \
-    `,
+    const changes = cmd(
+      "git diff HEAD^ HEAD CHANGELOG.md | { grep '^+[^+]' || true; }",
     );
-  }
-
-  if (
-    buildObj.appCenterApiToken &&
-    buildObj.appCenterAppName &&
-    buildObj.appCenterGroupName &&
-    !simBuild
-  ) {
-    mylog('\n\nUploading to App Center');
-    mylog('***********************\n');
+    const changelog = encodeURIComponent(changes);
+    mylog(`\n\nUploading to Zealot: ${zealotUrl}`);
+    mylog(
+      '***********************************************************************\n',
+    );
 
     call(
-      `npx appcenter distribute release --app ${buildObj.appCenterGroupName}/${
-        buildObj.appCenterAppName
-      } --file ${buildObj.ipaFile} --token ${buildObj.appCenterApiToken} -g ${
-        buildObj.appCenterDistroGroup
-      } -r ${JSON.stringify(notes)}`,
+      `curl -X POST "${zealotUrl}/api/apps/upload?token=${zealotApiToken}&channel_key=${zealotChannelKey}&branch=${branch}&git_commit=${gitCommit}&changelog=${changelog}" -F "file=@${buildObj.ipaFile}"`,
     );
-    mylog('\n*** Upload to App Center Complete ***');
+    mylog('\n*** Upload to Zealot Complete ***');
   }
 
   if (buildObj.rsyncLocation != null) {
@@ -574,11 +561,12 @@ function buildCommonPost(buildObj: BuildObj) {
       .replace(/:/gi, '')
       .replace(/-/gi, '');
     const [fileExtension] = buildObj.ipaFile.split('.').reverse();
+    const testBuild = maestroBuild ? '--maestro' : '';
     const rsyncFile = escapePath(
       `${datePrefix}--${productNameClean}--${platformType}--${repoBranch}--${buildNum}--${guiHash.slice(
         0,
         8,
-      )}.${fileExtension}`,
+      )}${testBuild}.${fileExtension}`,
     );
 
     const rsyncFilePath = join(buildObj.rsyncLocation, rsyncFile);
@@ -587,7 +575,8 @@ function buildCommonPost(buildObj: BuildObj) {
     );
     mylog('\n*** Upload to rsyncLocation Complete ***');
 
-    if (testRepoUrl != null) {
+    // Only update the test repo for maestro builds
+    if (testRepoUrl != null && maestroBuild) {
       mylog(`\n\nUpdating test repo ${buildObj.testRepoUrl}`);
       mylog('***********************************************************\n');
 
