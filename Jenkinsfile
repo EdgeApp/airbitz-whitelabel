@@ -48,17 +48,17 @@ pipeline {
 
   tools {
     jdk '17'
-    nodejs '18'
+    nodejs '22'
   }
   options {
     timestamps()
     skipDefaultCheckout true
-    overrideIndexTriggers false
+    overrideIndexTriggers true
     buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '7', numToKeepStr: '10')
     disableConcurrentBuilds()
   }
   triggers {
-    pollSCM('H/2 * * * *')
+    githubPush()
   }
   parameters {
     booleanParam(name: 'ANDROID_BUILD', defaultValue: true, description: 'Build an Android version')
