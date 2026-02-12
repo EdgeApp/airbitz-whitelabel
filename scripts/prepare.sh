@@ -3,5 +3,5 @@
 yarn patch-package
 
 if [ ! -f env.json ]; then
-    echo '{ "AIRBITZ_API_KEY": "" }' > env.json
+    echo '{ "EDGE_API_KEY": "", "EDGE_API_SECRET": "" }' > env.json
 fi

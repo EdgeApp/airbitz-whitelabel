@@ -1,4 +1,4 @@
-import {EdgeContext, MakeEdgeContext} from 'edge-core-js';
+import {asBase16, EdgeContext, MakeEdgeContext} from 'edge-core-js';
 import {LoginUiProvider} from 'edge-login-ui-rn';
 import * as React from 'react';
 import {StyleSheet} from 'react-native';
@@ -21,7 +21,8 @@ export const App = (_props: Props) => {
         <LoginUiProvider>
           <MakeEdgeContext
             airbitzSupport
-            apiKey={ENV.AIRBITZ_API_KEY}
+            apiKey={ENV.EDGE_API_KEY}
+            apiSecret={asBase16(ENV.EDGE_API_SECRET)}
             appId=""
             // Called when the core is done loading:
             onLoad={setContext}
